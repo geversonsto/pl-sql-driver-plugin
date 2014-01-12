@@ -6,32 +6,37 @@
 
 package name.dougmcneil.plsql;
 
+import name.dougmcneil.plsql.sql.Driver;
+import static name.dougmcneil.plsql.Loggers.INIT_LOG;
 import org.netbeans.spi.db.explorer.DatabaseRuntime;
 
 /**
- *
+ * Implementation of DatabaseRuntime to control registering of wrapped oracle driver.
  * @author doug
  */
 public class PLSQLRegister implements DatabaseRuntime {
 
+    private boolean _started;
+    
     @Override
     public String getJDBCDriverClass() {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        return Driver.DRIVER_CLASS;
     }
 
+    
     @Override
     public boolean acceptsDatabaseURL(String string) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        return string.startsWith("jdbc:thin:plsql");
     }
 
     @Override
     public boolean isRunning() {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        return _started;
     }
 
     @Override
     public boolean canStart() {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        return true;
     }
 
     @Override

@@ -58,6 +58,7 @@ public class PLSQLPropertiesPanel extends javax.swing.JPanel {
             PLSQLDriver.getInstance().setJarPath(
                     panel.jTextFieldJarLocation.getSelectedText());
             
+            PLSQLDriver.getInstance().init();
             return true;
         }
     }

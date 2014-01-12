@@ -27,14 +27,14 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.Executor;
 import java.util.logging.Logger;
+import static name.dougmcneil.plsql.Loggers.INIT_LOG;
 
 /**
  * Implementation of Driver. 
  * @author doug
  */
 public class Driver implements java.sql.Driver {
-    
-    private static final Logger LOGGER = Logger.getLogger("plsql-driver");
+    public static final String DRIVER_CLASS = "name.dougmcneil.plsql.sql.Driver";
     
     private java.sql.Driver _wrapped;
     
@@ -74,7 +74,7 @@ public class Driver implements java.sql.Driver {
 
     @Override
     public Logger getParentLogger() throws SQLFeatureNotSupportedException {
-        return LOGGER;
+        return INIT_LOG;
     }
     
     private class PLSQLConnection implements Connection {

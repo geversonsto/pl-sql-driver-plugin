@@ -18,7 +18,7 @@ import org.openide.util.actions.CallableSystemAction;
 public class PLSQLProperties extends CallableSystemAction {
     
     public PLSQLProperties() {
-        putValue("noIconInMenu", true);
+        putValue("noIconInMenu", false);
     }
 
     @Override
