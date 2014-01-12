@@ -10,11 +10,9 @@ import java.io.IOException;
 import java.net.URL;
 import java.util.logging.Level;
 import static name.dougmcneil.plsql.Loggers.INIT_LOG;
-import name.dougmcneil.plsql.sql.Driver;
 import org.netbeans.api.db.explorer.DatabaseException;
 import org.netbeans.api.db.explorer.JDBCDriver;
 import org.netbeans.api.db.explorer.JDBCDriverManager;
-import org.netbeans.modules.db.explorer.DbDriverManager;
 import org.openide.filesystems.FileSystem;
 import org.openide.filesystems.FileUtil;
 import org.openide.util.Exceptions;
@@ -26,6 +24,7 @@ import org.openide.util.Exceptions;
  */
 final public class PLSQLDriver {
     
+    public static final String DRIVER_CLASS = "name.dougmcneil.plsql.driver.Driver";
     public static final String ORACLE_DRIVER_CLASS = "oracle.jdbc.driver.OracleDriver";
     
     private static final PLSQLDriver INSTANCE = new PLSQLDriver();
@@ -73,7 +72,7 @@ final public class PLSQLDriver {
             }
         }
         try {
-            JDBCDriver newDriver = JDBCDriver.create("plsql_wrapper", "PLSQL Wrapping Driver", Driver.DRIVER_CLASS, new URL[]{});
+            JDBCDriver newDriver = JDBCDriver.create("plsql_wrapper", "PLSQL Wrapping Driver", DRIVER_CLASS, new URL[]{});
             JDBCDriverManager.getDefault().addDriver(newDriver);
             _registered = true;
          } catch (DatabaseException e) {
