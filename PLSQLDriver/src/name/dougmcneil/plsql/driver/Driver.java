@@ -34,7 +34,7 @@ import java.util.logging.Logger;
  */
 public class Driver implements java.sql.Driver {
     public static final Logger DRIVER_LOG = Logger.getLogger("plsql-driver");
-    public static final String DRIVER_CLASS = "name.dougmcneil.plsql.sql.Driver";
+    public static final String DRIVER_CLASS = "name.dougmcneil.plsql.driver.Driver";
     
     private java.sql.Driver _wrapped;
     
