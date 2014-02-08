@@ -15,5 +15,9 @@ import java.util.logging.Logger;
 public class Loggers {
     public static final Logger INIT_LOG = Logger.getLogger("plsql-init");
     
+    public static final Logger EVENT_LOG = Logger.getLogger("plsql-event");
     
+    public static final Logger DRIVER_LOG = Logger.getLogger("plsql-driver");
+    
+    public static final String EVENT_MSG = "Change event: %s -> %s";
 }

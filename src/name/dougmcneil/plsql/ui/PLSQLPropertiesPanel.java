@@ -7,16 +7,13 @@
 package name.dougmcneil.plsql.ui;
 
 import java.awt.Dialog;
-import java.io.File;
-import javax.swing.JFileChooser;
+import javax.swing.JCheckBox;
+import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
 import name.dougmcneil.plsql.PLSQLDriver;
-import name.dougmcneil.plsql.PLSQLNodeProvider;
 import org.openide.util.NbBundle;
 import org.openide.DialogDescriptor;
 import org.openide.DialogDisplayer;
-import org.openide.NotifyDescriptor;
-import org.openide.util.Lookup;
 
 /**
  *
@@ -25,6 +22,7 @@ import org.openide.util.Lookup;
 public class PLSQLPropertiesPanel extends javax.swing.JPanel {
 
     private DialogDescriptor _descriptor;
+    
     
     /**
      * Creates new form SQLPropertiesPanel
@@ -37,8 +35,14 @@ public class PLSQLPropertiesPanel extends javax.swing.JPanel {
         assert SwingUtilities.isEventDispatchThread();
 
         PLSQLPropertiesPanel panel = new PLSQLPropertiesPanel();
+        PLSQLDriver driver = PLSQLDriver.getInstance();
+        if (driver.getStatus() != PLSQLDriver.Status.REGISTERED) {
+            PLSQLDriver.getInstance().init();
+        }
+        checkStatus(panel.jCheckBoxRegistered, panel.jTextFieldStatus);
+        panel.jCheckBoxRegistered.setSelected(driver.getStatus() == PLSQLDriver.Status.REGISTERED);
+        
         String title = NbBundle.getMessage(PLSQLPropertiesPanel.class, "LBL_PropertiesPanel");
-
         DialogDescriptor desc = new DialogDescriptor(panel, title);
         desc.createNotificationLineSupport();
 
@@ -55,10 +59,6 @@ public class PLSQLPropertiesPanel extends javax.swing.JPanel {
                 return false; // NOI18N
             }
 
-            PLSQLDriver.getInstance().setJarPath(
-                    panel.jTextFieldJarLocation.getSelectedText());
-            
-            PLSQLDriver.getInstance().init();
             return true;
         }
     }
@@ -71,23 +71,23 @@ public class PLSQLPropertiesPanel extends javax.swing.JPanel {
     private void initComponents() {
 
         jLabelTitle = new javax.swing.JLabel();
-        jLabelJarLocation = new javax.swing.JLabel();
-        jTextFieldJarLocation = new javax.swing.JTextField();
-        jButtonBrowse = new javax.swing.JButton();
+        jCheckBoxRegistered = new javax.swing.JCheckBox();
+        jTextFieldStatus = new javax.swing.JTextField();
 
         jLabelTitle.setFont(new java.awt.Font("Tahoma", 1, 14)); // NOI18N
         org.openide.awt.Mnemonics.setLocalizedText(jLabelTitle, org.openide.util.NbBundle.getMessage(PLSQLPropertiesPanel.class, "PLSQLPropertiesPanel.jLabelTitle.text")); // NOI18N
 
-        org.openide.awt.Mnemonics.setLocalizedText(jLabelJarLocation, org.openide.util.NbBundle.getMessage(PLSQLPropertiesPanel.class, "PLSQLPropertiesPanel.jLabelJarLocation.text")); // NOI18N
-
-        jTextFieldJarLocation.setToolTipText(org.openide.util.NbBundle.getMessage(PLSQLPropertiesPanel.class, "PLSQLPropertiesPanel.jTextFieldJarLocation.text")); // NOI18N
-
-        org.openide.awt.Mnemonics.setLocalizedText(jButtonBrowse, org.openide.util.NbBundle.getMessage(PLSQLPropertiesPanel.class, "PLSQLPropertiesPanel.jButtonBrowse.text")); // NOI18N
-        jButtonBrowse.addActionListener(new java.awt.event.ActionListener() {
+        org.openide.awt.Mnemonics.setLocalizedText(jCheckBoxRegistered, org.openide.util.NbBundle.getMessage(PLSQLPropertiesPanel.class, "PLSQLPropertiesPanel.jCheckBoxRegistered.text")); // NOI18N
+        jCheckBoxRegistered.setToolTipText(org.openide.util.NbBundle.getMessage(PLSQLPropertiesPanel.class, "registered.checkbox")); // NOI18N
+        jCheckBoxRegistered.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
-                jButtonBrowseActionPerformed(evt);
+                jCheckBoxRegisteredActionPerformed(evt);
             }
         });
+
+        jTextFieldStatus.setEditable(false);
+        jTextFieldStatus.setForeground(new java.awt.Color(255, 0, 0));
+        jTextFieldStatus.setBorder(null);
 
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(this);
         this.setLayout(layout);
@@ -96,49 +96,55 @@ public class PLSQLPropertiesPanel extends javax.swing.JPanel {
             .addGroup(layout.createSequentialGroup()
                 .addContainerGap()
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addGroup(layout.createSequentialGroup()
-                        .addComponent(jLabelTitle)
-                        .addGap(0, 193, Short.MAX_VALUE))
-                    .addGroup(layout.createSequentialGroup()
-                        .addComponent(jLabelJarLocation)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(jTextFieldJarLocation)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(jButtonBrowse)))
-                .addContainerGap())
+                    .addComponent(jCheckBoxRegistered)
+                    .addComponent(jLabelTitle)
+                    .addComponent(jTextFieldStatus, javax.swing.GroupLayout.PREFERRED_SIZE, 400, javax.swing.GroupLayout.PREFERRED_SIZE))
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
         layout.setVerticalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(layout.createSequentialGroup()
                 .addContainerGap()
                 .addComponent(jLabelTitle)
+                .addGap(18, 18, 18)
+                .addComponent(jCheckBoxRegistered)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                    .addComponent(jLabelJarLocation)
-                    .addComponent(jTextFieldJarLocation, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(jButtonBrowse))
-                .addContainerGap(27, Short.MAX_VALUE))
+                .addComponent(jTextFieldStatus, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
     }// </editor-fold>//GEN-END:initComponents
 
-    private void jButtonBrowseActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButtonBrowseActionPerformed
-        JFileChooser chooser = new JFileChooser();
-        chooser.setAcceptAllFileFilterUsed(false);
-        chooser.setCurrentDirectory(null);
-        chooser.setDialogTitle(NbBundle.getMessage(PLSQLPropertiesPanel.class, "LBL_FindFile"));
-        chooser.setMultiSelectionEnabled(false);
-        chooser.setSelectedFile(null);
-        
-        if (chooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
-            jTextFieldJarLocation.setText(chooser.getSelectedFile().getAbsolutePath());
+    private void jCheckBoxRegisteredActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jCheckBoxRegisteredActionPerformed
+        String action = evt.getActionCommand();
+        if (jCheckBoxRegistered.isSelected()) {
+            PLSQLDriver.getInstance().init();
+            checkStatus(jCheckBoxRegistered, jTextFieldStatus);
+            if (PLSQLDriver.getInstance().getStatus() != PLSQLDriver.Status.REGISTERED) {
+                jCheckBoxRegistered.setSelected(false);
+            }
         }
-    }//GEN-LAST:event_jButtonBrowseActionPerformed
+    }//GEN-LAST:event_jCheckBoxRegisteredActionPerformed
 
+    private static void checkStatus(JCheckBox box, JTextField text) {
+        if (PLSQLDriver.getInstance().getStatus() == PLSQLDriver.Status.NO_DRIVER_OR_NO_JAR) {
+            text.setText(NbBundle.getMessage(
+                    PLSQLPropertiesPanel.class, "registered.status.no_driver_or_no_jar"));
+        } else if (PLSQLDriver.getInstance().getStatus() == PLSQLDriver.Status.NO_PLSQL_JAR) {
+            text.setText(NbBundle.getMessage(
+                    PLSQLPropertiesPanel.class, "registered.status.no_plsql_jar"));
+        } else if (PLSQLDriver.getInstance().getStatus() == PLSQLDriver.Status.CANNOT_CREATE_DRIVER) {
+            text.setText(NbBundle.getMessage(
+                    PLSQLPropertiesPanel.class, "registered.status.cannot_create_driver"));
+        } else {
+            box.setEnabled(false);
+            text.setText(null);
+        }
+        
+    }
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
-    private javax.swing.JButton jButtonBrowse;
-    private javax.swing.JLabel jLabelJarLocation;
+    private javax.swing.JCheckBox jCheckBoxRegistered;
     private javax.swing.JLabel jLabelTitle;
-    private javax.swing.JTextField jTextFieldJarLocation;
+    private javax.swing.JTextField jTextFieldStatus;
     // End of variables declaration//GEN-END:variables
 }

@@ -15,12 +15,12 @@
                 </folder>
             </folder>
         </folder>
-        <folder name="Runtimes">
+       <!-- <folder name="Runtimes">
             <file name="PLSQLRuntime.instance">
                 <attr name="instanceCreate"
                       methodvalue="name.dougmcneil.plsql.PLSQLRegister.getInstance"/>
                 <attr name="instanceOf" stringvalue="org.netbeans.spi.db.explorer.DatabaseRuntime"/>
             </file>
-        </folder>
+        </folder>-->
     </folder>
 </filesystem>

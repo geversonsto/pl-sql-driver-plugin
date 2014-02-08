@@ -7,7 +7,6 @@
 package name.dougmcneil.plsql;
 
 import name.dougmcneil.plsql.sql.Driver;
-import static name.dougmcneil.plsql.Loggers.INIT_LOG;
 import org.netbeans.spi.db.explorer.DatabaseRuntime;
 
 /**

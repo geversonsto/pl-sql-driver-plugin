@@ -19,19 +19,11 @@
           <Group type="102" attributes="0">
               <EmptySpace max="-2" attributes="0"/>
               <Group type="103" groupAlignment="0" attributes="0">
-                  <Group type="102" alignment="0" attributes="0">
-                      <Component id="jLabelTitle" min="-2" max="-2" attributes="0"/>
-                      <EmptySpace min="0" pref="193" max="32767" attributes="0"/>
-                  </Group>
-                  <Group type="102" alignment="0" attributes="0">
-                      <Component id="jLabelJarLocation" min="-2" max="-2" attributes="0"/>
-                      <EmptySpace max="-2" attributes="0"/>
-                      <Component id="jTextFieldJarLocation" max="32767" attributes="0"/>
-                      <EmptySpace max="-2" attributes="0"/>
-                      <Component id="jButtonBrowse" min="-2" max="-2" attributes="0"/>
-                  </Group>
+                  <Component id="jCheckBoxRegistered" min="-2" max="-2" attributes="0"/>
+                  <Component id="jLabelTitle" min="-2" max="-2" attributes="0"/>
+                  <Component id="jTextFieldStatus" alignment="0" min="-2" pref="400" max="-2" attributes="0"/>
               </Group>
-              <EmptySpace max="-2" attributes="0"/>
+              <EmptySpace max="32767" attributes="0"/>
           </Group>
       </Group>
     </DimensionLayout>
@@ -40,13 +32,11 @@
           <Group type="102" alignment="0" attributes="0">
               <EmptySpace max="-2" attributes="0"/>
               <Component id="jLabelTitle" min="-2" max="-2" attributes="0"/>
+              <EmptySpace type="separate" max="-2" attributes="0"/>
+              <Component id="jCheckBoxRegistered" min="-2" max="-2" attributes="0"/>
               <EmptySpace type="unrelated" max="-2" attributes="0"/>
-              <Group type="103" groupAlignment="3" attributes="0">
-                  <Component id="jLabelJarLocation" alignment="3" min="-2" max="-2" attributes="0"/>
-                  <Component id="jTextFieldJarLocation" alignment="3" min="-2" max="-2" attributes="0"/>
-                  <Component id="jButtonBrowse" alignment="3" min="-2" max="-2" attributes="0"/>
-              </Group>
-              <EmptySpace pref="27" max="32767" attributes="0"/>
+              <Component id="jTextFieldStatus" min="-2" max="-2" attributes="0"/>
+              <EmptySpace max="32767" attributes="0"/>
           </Group>
       </Group>
     </DimensionLayout>
@@ -62,29 +52,29 @@
         </Property>
       </Properties>
     </Component>
-    <Component class="javax.swing.JLabel" name="jLabelJarLocation">
+    <Component class="javax.swing.JCheckBox" name="jCheckBoxRegistered">
       <Properties>
         <Property name="text" type="java.lang.String" editor="org.netbeans.modules.i18n.form.FormI18nStringEditor">
-          <ResourceString bundle="name/dougmcneil/plsql/ui/Bundle.properties" key="PLSQLPropertiesPanel.jLabelJarLocation.text" replaceFormat="org.openide.util.NbBundle.getMessage({sourceFileName}.class, &quot;{key}&quot;)"/>
+          <ResourceString bundle="name/dougmcneil/plsql/ui/Bundle.properties" key="PLSQLPropertiesPanel.jCheckBoxRegistered.text" replaceFormat="org.openide.util.NbBundle.getMessage({sourceFileName}.class, &quot;{key}&quot;)"/>
         </Property>
-      </Properties>
-    </Component>
-    <Component class="javax.swing.JTextField" name="jTextFieldJarLocation">
-      <Properties>
         <Property name="toolTipText" type="java.lang.String" editor="org.netbeans.modules.i18n.form.FormI18nStringEditor">
-          <ResourceString bundle="name/dougmcneil/plsql/ui/Bundle.properties" key="PLSQLPropertiesPanel.jTextFieldJarLocation.text" replaceFormat="org.openide.util.NbBundle.getMessage({sourceFileName}.class, &quot;{key}&quot;)"/>
-        </Property>
-      </Properties>
-    </Component>
-    <Component class="javax.swing.JButton" name="jButtonBrowse">
-      <Properties>
-        <Property name="text" type="java.lang.String" editor="org.netbeans.modules.i18n.form.FormI18nStringEditor">
-          <ResourceString bundle="name/dougmcneil/plsql/ui/Bundle.properties" key="PLSQLPropertiesPanel.jButtonBrowse.text" replaceFormat="org.openide.util.NbBundle.getMessage({sourceFileName}.class, &quot;{key}&quot;)"/>
+          <ResourceString bundle="name/dougmcneil/plsql/ui/Bundle.properties" key="registered.checkbox" replaceFormat="org.openide.util.NbBundle.getMessage({sourceFileName}.class, &quot;{key}&quot;)"/>
         </Property>
       </Properties>
       <Events>
-        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="jButtonBrowseActionPerformed"/>
+        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="jCheckBoxRegisteredActionPerformed"/>
       </Events>
+    </Component>
+    <Component class="javax.swing.JTextField" name="jTextFieldStatus">
+      <Properties>
+        <Property name="editable" type="boolean" value="false"/>
+        <Property name="foreground" type="java.awt.Color" editor="org.netbeans.beaninfo.editors.ColorEditor">
+          <Color blue="0" green="0" red="ff" type="rgb"/>
+        </Property>
+        <Property name="border" type="javax.swing.border.Border" editor="org.netbeans.modules.form.editors2.BorderEditor">
+          <Border info="null"/>
+        </Property>
+      </Properties>
     </Component>
   </SubComponents>
 </Form>
