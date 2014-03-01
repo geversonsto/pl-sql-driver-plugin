@@ -29,6 +29,8 @@ import org.netbeans.api.db.explorer.JDBCDriverManager;
 import org.openide.filesystems.FileSystem;
 import org.openide.filesystems.FileUtil;
 import org.openide.util.Exceptions;
+import org.openide.windows.IOProvider;
+import org.openide.windows.InputOutput;
 
 /**
  * Controls Driver initialization sequence.
@@ -54,7 +56,13 @@ public final class PLSQLDriver implements ConnectionListener, PropertyChangeList
         /** new connection */
         NEW_CONNECTION,
         /** new statement */
-        NEW_STATEMENT;
+        NEW_STATEMENT,
+        /** line of DBMS_OUTPUT */
+        DBMS_OUTPUT_LINE,
+        /** Disconnected connection */
+        DISCONNECTED,
+        /** String error message from DBMS_OUTPUT */
+        ERROR_DBMS_OUTPUT;
     }
     
     public static enum Status { 
@@ -67,6 +75,7 @@ public final class PLSQLDriver implements ConnectionListener, PropertyChangeList
     
     private DriverChange _changer = new DriverChange();
     
+    private InputOutput _io;
     
     @SuppressWarnings("LeakingThisInConstructor")
     private PLSQLDriver() {
@@ -74,6 +83,9 @@ public final class PLSQLDriver implements ConnectionListener, PropertyChangeList
         // @todo might refine to specify what properties to listen to
         _changer.addPropertyChangeListener(CommProperties.NEW_CONNECTION.name(), this);
         _changer.addPropertyChangeListener(CommProperties.NEW_STATEMENT.name(), this);
+        _changer.addPropertyChangeListener(CommProperties.DISCONNECTED.name(), this);
+        _changer.addPropertyChangeListener(CommProperties.DBMS_OUTPUT_LINE.name(), this);
+        _changer.addPropertyChangeListener(CommProperties.ERROR_DBMS_OUTPUT.name(), this);
         init();
         //ConnectionManager.getDefault().addConnectionListener(this);
     }
@@ -150,13 +162,14 @@ public final class PLSQLDriver implements ConnectionListener, PropertyChangeList
             try {
                 newDriver = JDBCDriver.create("plsql_wrapper", "PLSQL Wrapping Driver", DRIVER_CLASS,
                         new URL[]{file.toURI().toURL()});
-                return newDriver;
             } catch (MalformedURLException ex) {
                 Exceptions.printStackTrace(ex);
+                return null;
             }
             JDBCDriverManager.getDefault().addDriver(newDriver);
             _status = Status.REGISTERED;
             INIT_LOG.log(Level.INFO, "Registration complete");
+            return newDriver;
          } catch (DatabaseException e) {
              _status = Status.CANNOT_CREATE_DRIVER;
             INIT_LOG.log(Level.SEVERE, null, e);
@@ -177,7 +190,25 @@ public final class PLSQLDriver implements ConnectionListener, PropertyChangeList
     // All "communication" between Driver/Connection and PLSQLDRiver flows through here
     @Override
     public void propertyChange(PropertyChangeEvent evt) {
-        EVENT_LOG.log(Level.FINER, String.format(EVENT_MSG, evt.getPropertyName(), evt.getOldValue()));
+        switch (CommProperties.valueOf(evt.getPropertyName())) {
+            case DBMS_OUTPUT_LINE:
+                String[] output = (String []) evt.getNewValue();
+                _io.getOut().println(String.format("%s : MSG: %s", output[0], output[1]));
+                break;
+            case NEW_CONNECTION:
+            case NEW_STATEMENT:
+            case DISCONNECTED:
+                _io = IOProvider.getDefault().getIO("PL/SQL", false);
+                _io.getOut().println();
+            case ERROR_DBMS_OUTPUT:
+                EVENT_LOG.log(Level.INFO, String.format(EVENT_MSG, evt.getPropertyName(),
+                        evt.getNewValue()));
+                break;
+            default:
+                EVENT_LOG.log(Level.WARNING, String.format("Unknown property change: %s", 
+                        evt.getPropertyName()));
+                break;
+        }
     }
     
     // When plsql driver is first created (or found on startup) it must be integrated with NetBeans

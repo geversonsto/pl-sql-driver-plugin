@@ -34,6 +34,7 @@ import java.sql.SQLXML;
 import java.sql.Savepoint;
 import java.sql.Statement;
 import java.sql.Struct;
+import java.sql.Types;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Properties;
@@ -93,7 +94,7 @@ public class Driver implements java.sql.Driver, PropertyChangeListener {
             init(info);
             return null;
         }
-        return new PLSQLConnection(_wrapped.connect(url, info), _changer);
+        return new PLSQLConnection(url, _wrapped.connect(url, info), _changer);
     }
 
     @Override
@@ -144,17 +145,33 @@ public class Driver implements java.sql.Driver, PropertyChangeListener {
 
     private static class PLSQLConnection implements Connection {
         
+        private static final String NAME_MSG = "%s :- %s";
+        
+        private final String _name;
+        
+        private final String _url;
         private final Connection _wrapper;
         private final PropertyChangeSupport _changer;
-        private PLSQLConnection(Connection wrapper, PropertyChangeSupport changer) {
+        private final DbmsOutputProcess _dbmsOutput;
+        private PLSQLConnection(String url, Connection wrapper, PropertyChangeSupport changer) {
+            _url = url;
             _wrapper = wrapper;
             _changer = changer;
-            _changer.firePropertyChange(NEW_CONNECTION.name(), null, this);
+            String name;
+            try {
+                name = String.format(NAME_MSG,url, getSchema());
+                _changer.firePropertyChange(NEW_CONNECTION.name(), null, name);
+            } catch (SQLException ex) {
+                name = "unknown";
+            }
+            _name = name;
+            _dbmsOutput = new DbmsOutputProcess(changer, wrapper, _name);
+            _dbmsOutput.event(DbmsOutputProcess.Event.BEGIN);
         }
 
         @Override
         public Statement createStatement() throws SQLException {
-            return new PLSQLStatement(_wrapper.createStatement(), _changer);
+            return new PLSQLStatement(_wrapper.createStatement(), _changer, _dbmsOutput, _name);
         }
 
         @Override
@@ -185,16 +202,22 @@ public class Driver implements java.sql.Driver, PropertyChangeListener {
         @Override
         public void commit() throws SQLException {
             _wrapper.commit();
+            _dbmsOutput.event(DbmsOutputProcess.Event.POST);
         }
 
         @Override
         public void rollback() throws SQLException {
             _wrapper.rollback();
+            _dbmsOutput.event(DbmsOutputProcess.Event.POST);
         }
 
         @Override
         public void close() throws SQLException {
             _wrapper.close();
+            if (_wrapper.isClosed()) {
+                _changer.firePropertyChange(CommProperties.DISCONNECTED.name(), null, _name);
+                _dbmsOutput.event(DbmsOutputProcess.Event.END);
+            }
         }
 
         @Override
@@ -249,7 +272,8 @@ public class Driver implements java.sql.Driver, PropertyChangeListener {
 
         @Override
         public Statement createStatement(int resultSetType, int resultSetConcurrency) throws SQLException {
-            return _wrapper.createStatement(resultSetType, resultSetConcurrency);
+            return new PLSQLStatement(_wrapper.createStatement(resultSetType, resultSetConcurrency),
+                    _changer, _dbmsOutput, _name);
         }
 
         @Override
@@ -426,28 +450,43 @@ public class Driver implements java.sql.Driver, PropertyChangeListener {
     
     private static class PLSQLStatement implements Statement {
         
+        private static int _statementCount;
         private final Statement _wrapper;
         private final PropertyChangeSupport _changer;
+        private final DbmsOutputProcess _dbmsOutput;
+        private final String _connectionName;
         
-        private PLSQLStatement(Statement wrapper, PropertyChangeSupport changer) {
+        private PLSQLStatement(Statement wrapper, PropertyChangeSupport changer,
+                DbmsOutputProcess dbmsOutput, String connectionName) {
+            _connectionName = connectionName;
+            _statementCount++;
             _wrapper = wrapper;
             _changer = changer;
-            _changer.firePropertyChange(CommProperties.NEW_STATEMENT.name(), null, this);
+            _dbmsOutput = dbmsOutput;
+            _changer.firePropertyChange(CommProperties.NEW_STATEMENT.name(), null, _statementCount);
         }
 
         @Override
         public ResultSet executeQuery(String sql) throws SQLException {
-            return _wrapper.executeQuery(sql);
+            try {
+                return _wrapper.executeQuery(sql);
+            } finally {
+                _dbmsOutput.event(DbmsOutputProcess.Event.EXECUTE);
+            }
         }
 
         @Override
         public int executeUpdate(String sql) throws SQLException {
-            return _wrapper.executeUpdate(sql);
+            try {
+                return _wrapper.executeUpdate(sql);
+            } finally {
+                _dbmsOutput.event(DbmsOutputProcess.Event.EXECUTE);
+            }
         }
 
         @Override
         public void close() throws SQLException {
-            _wrapper.close();;
+            _wrapper.close();
         }
 
         @Override
@@ -507,17 +546,29 @@ public class Driver implements java.sql.Driver, PropertyChangeListener {
 
         @Override
         public boolean execute(String sql) throws SQLException {
-            return _wrapper.execute(sql);
+            try {
+                return _wrapper.execute(sql);
+            } finally {
+                _dbmsOutput.event(DbmsOutputProcess.Event.EXECUTE);
+            }
         }
 
         @Override
         public ResultSet getResultSet() throws SQLException {
-            return _wrapper.getResultSet();
+            try {
+                return _wrapper.getResultSet();
+            } finally {
+                _dbmsOutput.event(DbmsOutputProcess.Event.POST);
+            }
         }
 
         @Override
         public int getUpdateCount() throws SQLException {
-            return _wrapper.getUpdateCount();
+            try {
+                return _wrapper.getUpdateCount();
+            } finally {
+                _dbmsOutput.event(DbmsOutputProcess.Event.POST);
+            }
         }
 
         @Override
@@ -655,6 +706,157 @@ public class Driver implements java.sql.Driver, PropertyChangeListener {
             return _wrapper.isWrapperFor(iface);
         }
     
+    }
+    
+    private static class DbmsOutputProcess {
+        
+        private static final String ENABLE_ERROR_MSG = "Error: DBMS_OUTPUT.ENABLE(NULL), %s";
+        private static final String DISABLE_ERROR_MSG = "Error: DBMS_OUTPUT.DISABLE, %s";
+
+        enum Status {
+            START,
+            READY,
+            PRINTED,
+            FAILED,
+            COMPLETE;
+        }
+        
+        enum Event {
+            BEGIN,
+            EXECUTE,
+            POST,
+            END;
+        }
+        private PropertyChangeSupport _pcs;
+        private Connection _connection;
+        private Status _status;
+        private final String _name;
+        DbmsOutputProcess(PropertyChangeSupport pcs, Connection connection, String name) {
+            _name = name;
+            _pcs = pcs;
+            _connection = connection;
+            _status = Status.START;
+        }
+        
+        /**
+         * Perform transitions based on event
+         * @param event marking transition
+         * @return what status transitioned to
+         */
+        public Status event(Event event) {
+            switch(_status) {
+                case START:
+                    if (event != Event.BEGIN) {
+                        break;
+                    }
+                    if (enable()) {
+                        _status = Status.READY;
+                    } else {
+                        disable();
+                        _status = Status.FAILED;
+                    }
+                    break;
+                    
+                case READY:
+                    
+                    if (event == Event.END) {
+                        _status = Status.COMPLETE;
+                        break;
+                    }
+                    
+                    if (event != Event.EXECUTE) {
+                        break;
+                    }
+                    print();
+                    _status = Status.PRINTED;
+                    break;
+                    
+                case PRINTED:
+                    
+                    if (event == Event.END) {
+                        _status = Status.COMPLETE;
+                        break;
+                    }
+                    
+                    if (event == Event.POST) {
+                        _status = Status.READY;
+                        break;
+                    }
+                    
+                    if (event != Event.EXECUTE) {
+                        break;
+                    }
+                    print();
+
+                    break;
+                    
+                case FAILED:
+                    
+                    if (event == Event.END) {
+                        _status = Status.COMPLETE;
+                        break;
+                    }
+                    
+                    if (event == Event.POST) {
+                        _status = Status.READY;
+                    }
+                    break;
+                    
+                case COMPLETE:
+                    
+                    break;
+            }
+            return _status;
+        }
+        
+        private boolean enable() {
+            // idempotent
+            try {
+                _connection.prepareCall("begin dbms_output.enable(null); end;").execute();
+                return true;
+            } catch (SQLException ex) {
+                _pcs.firePropertyChange(CommProperties.ERROR_DBMS_OUTPUT.name(), null, 
+                        String.format(ENABLE_ERROR_MSG, ex.toString()));
+                return false;
+            }
+        }
+        
+        private boolean disable() {
+            // idempotent
+            try {
+                _connection.prepareCall("begin dbms_output.disable; end;").execute();
+                return true;
+            } catch (SQLException ex) {
+                _pcs.firePropertyChange(CommProperties.ERROR_DBMS_OUTPUT.name(), null, 
+                        String.format(DISABLE_ERROR_MSG, ex.toString()));
+                return false;
+            }
+        }
+        
+        private void print() {
+            // print is idempotent, it will not re-print, etc.
+            try {
+                String getLineSql = "begin dbms_output.get_line(?,?); end;";
+                CallableStatement stmt = _connection.prepareCall(getLineSql);
+                boolean hasMore = true;
+                stmt.registerOutParameter(1, Types.VARCHAR);
+                stmt.registerOutParameter(2, Types.INTEGER);
+                
+                
+                while (hasMore) {
+                    boolean status = stmt.execute();
+                    hasMore = (stmt.getInt(2) == 0);
+                    if (hasMore) {
+                        _pcs.firePropertyChange(CommProperties.DBMS_OUTPUT_LINE.name(), null,
+                               new String[] {_name, stmt.getString(1)});
+                    }
+                }
+                stmt.close();
+            } catch (SQLException ex) {
+                Exceptions.printStackTrace(ex);
+            }
+        }
+        
     }
     
     private static class DbURLClassLoader extends URLClassLoader {
