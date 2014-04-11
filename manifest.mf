@@ -1,6 +1,7 @@
 Manifest-Version: 1.0
-OpenIDE-Module: name.dougmcneil.plsql
+OpenIDE-Module: name.dougmcneil.plsql/0
+OpenIDE-Module-Implementation-Version: 0
 OpenIDE-Module-Layer: name/dougmcneil/plsql/layer.xml
 OpenIDE-Module-Localizing-Bundle: name/dougmcneil/plsql/Bundle.properties
-OpenIDE-Module-Specification-Version: 1.0
+OpenIDE-Module-Requires: org.openide.windows.WindowManager
 

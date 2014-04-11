@@ -20,9 +20,8 @@ import org.openide.util.Lookup;
 public class PLSQLNodeProvider extends NodeProvider {
     
     // load driver when node requested
-    static {
+    private static final PLSQLDriver PLSQL_DRIVER =
         PLSQLDriver.getInstance();
-    }
     
     public PLSQLNodeProvider(Lookup lookup) {
         super(lookup);

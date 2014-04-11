@@ -6,7 +6,7 @@
 
 package name.dougmcneil.plsql;
 
-import name.dougmcneil.plsql.sql.Driver;
+import name.dougmcneil.plsql.jdbc.Driver;
 import org.netbeans.spi.db.explorer.DatabaseRuntime;
 
 /**

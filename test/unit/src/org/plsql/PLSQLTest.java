@@ -4,8 +4,13 @@
  * and open the template in the editor.
  */
 
-package br.com.porcelli.parser.plsql;
+package org.plsql;
 
+import org.antlr.runtime.ANTLRStringStream;
+import org.antlr.runtime.CommonTokenStream;
+import org.antlr.runtime.RecognitionException;
+import org.antlr.runtime.TokenStream;
+import org.antlr.runtime.tree.CommonTree;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -13,21 +18,13 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import static org.junit.Assert.*;
 
-import org.antlr.runtime.ANTLRStringStream;
-import org.antlr.runtime.CommonTokenStream;
-import org.antlr.runtime.RecognitionException;
-import org.antlr.runtime.TokenStream;
-import org.antlr.runtime.tree.CommonTree;
-import org.antlr.runtime.tree.CommonTreeNodeStream;
-import org.antlr.runtime.tree.DOTTreeGenerator;
-
 /**
  *
  * @author doug
  */
-public class SimpleCompileTest {
+public class PLSQLTest {
     
-    public SimpleCompileTest() {
+    public PLSQLTest() {
     }
     
     @BeforeClass
@@ -46,31 +43,30 @@ public class SimpleCompileTest {
     public void tearDown() {
     }
 
-    // TODO add test methods here.
-    // The methods must be annotated with annotation @Test. For example:
-    //
-    // @Test
-    // public void hello() {}
     @Test
     public void compilePLSQL() {
+        PLSQLParser parser = null;
+        CommonTree tree = null;
         try {
             //lexer splits input into tokens
             ANTLRStringStream input = new ANTLRStringStream(
-                            "declare foo integer; begin dbms_output.print_line('Hello Workd');");
+                           "declare foo integer; Begin dbms_output.print_line('Hello World'); end;\n");
+//            ANTLRStringStream input = new ANTLRStringStream(
+//                            "select * from foobar where x=y and a='bbbb';");
             TokenStream tokens = new CommonTokenStream(new PLSQLLexer(input));
 
-            PLSQLParser parser = new PLSQLParser(tokens);
+            parser = new PLSQLParser(tokens);
+            PLSQLParser.plsql_block_return rtn = parser.plsql_block();
+//            PLSQLParser.sql_statement_return rtn = parser.sql_statement();
             
-            PLSQLParser.block_return rtn = parser.block();
+            tree = (CommonTree) rtn.tree;
             
-            CommonTree tree = (CommonTree) rtn.tree;
-            
-          printTree(tree);
+            printTree(tree);
             
         } catch (RecognitionException ex) {
             fail(ex.getLocalizedMessage());
 
-        }
+        } 
     }
     
 	private void printTree(CommonTree ast) {
@@ -90,6 +86,4 @@ public class SimpleCompileTest {
                 print((CommonTree) ie, level + 1);
             }
     }
-
 }
-

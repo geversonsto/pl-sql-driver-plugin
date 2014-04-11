@@ -5,4 +5,40 @@
 <project name="name.dougmcneil.plsql" default="netbeans" basedir=".">
     <description>Builds, tests, and runs the project name.dougmcneil.plsql.</description>
     <import file="nbproject/build-impl.xml"/>
+    <target name="-pre-compile" depends="antlr-br,antlr-org">
+    </target>
+ 
+    <target name="init-antlr">
+        <!-- Full path to Antlr jar -->
+        <property name="antlr.jar" 
+                location="C:\Users\doug\Documents\java\antlr\antlr-3.5.1-complete.jar"/>
+        <!-- Grammar path -->
+        <property name="antlr.imports" location="src/br/com/porcelli/parser/plsql/imports"/>
+        <property name="antlr.lexer" location="src/br/com/porcelli/parser/plsql/PLSQLLexer.g"/>
+        <property name="antlr.parser" location="src/br/com/porcelli/parser/plsql/PLSQLParser.g"/>
+        <property name="antlr.walker" location="src/br/com/porcelli/parser/plsql/PLSQLWalker.g"/>
+        <property name="antlr-org.parser" location="src/org/plsql/PLSQL.g"/>
+    </target>
+
+    <target name="antlr-br" depends="init-antlr" unless="up-to-date">
+        <!-- Compiling grammar -->
+        <java classname="org.antlr.Tool"  fork="true">
+            <arg value="-Xmx3g"/>
+            <arg value="-Xmultithreaded"/>
+            <arg value="${antlr.lexer}"/>
+            <arg value="${antlr.parser}"/>
+            <arg value="${antlr.walker}"/>
+            <classpath path="${antlr.jar}"/>
+        </java>        
+    </target>
+
+    <target name="antlr-org" depends="init-antlr" unless="up-to-date">
+        <!-- Compiling grammar -->
+        <java classname="org.antlr.Tool"  fork="true">
+            <arg value="-Xmx3g"/>
+            <arg value="-Xmultithreaded"/>
+            <arg value="${antlr-org.parser}"/>
+            <classpath path="${antlr.jar}"/>
+        </java>        
+    </target>
 </project>
