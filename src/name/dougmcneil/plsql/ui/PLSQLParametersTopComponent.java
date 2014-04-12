@@ -223,7 +223,7 @@ public final class PLSQLParametersTopComponent extends TopComponent {
                     return;
                 }
                 //model.addElement(selected);
-                selected = Type.promote(selected, box._col);
+                selected = Type.promote(selected, box._row, box._col);
                 box.addItem((Type) selected);
                 box.setSelectedItem(selected);
             }
@@ -267,7 +267,7 @@ public final class PLSQLParametersTopComponent extends TopComponent {
 
             @Override
             public void setSelectedItem(Object item) {
-                item = Type.promote(item, _col);
+                item = Type.promote(item, _row, _col);
                 super.setSelectedItem(item);
                 if (getSelectedIndex() == -1) {
                     return;
@@ -302,6 +302,10 @@ public final class PLSQLParametersTopComponent extends TopComponent {
         }
         
         public void setContent(String content) {
+            if (content == null) {
+                _content = "";
+                return;
+            }
             _content = content;
         }
         
@@ -309,12 +313,12 @@ public final class PLSQLParametersTopComponent extends TopComponent {
             return _content;
         }
         
-        public static Type promote(Object candidate, int col) {
+        public static Type promote(Object candidate, int row, int col) {
             if (candidate instanceof Type) {
                 return (Type) candidate;
             }
             if (col == 0) {
-                return new Parameter((String) candidate);
+                return new Parameter((String) candidate, row);
             }
             return new Value((String) candidate);
         }
@@ -322,9 +326,9 @@ public final class PLSQLParametersTopComponent extends TopComponent {
     
     private static class Parameter extends Type {
         private int _pos;
-        public Parameter(String content) {
+        public Parameter(String content, int row) {
             super(content);
-            _pos = Integer.parseInt(content.substring(1));
+            _pos = row + 1;
         }
         
         public Parameter(int pos) {
