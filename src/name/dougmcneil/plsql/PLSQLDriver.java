@@ -55,6 +55,7 @@ public final class PLSQLDriver implements ConnectionListener, PropertyChangeList
     public static final String ORACLE_DRIVER_CLASS = "oracle.jdbc.OracleDriver";
     public static final String ORACLE_DRIVER_JAR_PROP = "name.dougmcneil.plsql.oracle-jar";
     
+    // @todo convert to @Message
     private static final String START_DBMS_OUTPUT = NbBundle.getMessage(
                     PLSQLDriver.class, "start-dbms_output");
     private static final String END_DBMS_OUTPUT = NbBundle.getMessage(
@@ -97,14 +98,30 @@ public final class PLSQLDriver implements ConnectionListener, PropertyChangeList
     /** Plugin driver status.
      */
     public static enum Status { 
-        NOT_REGISTERED, REGISTERED, NO_DRIVER_OR_NO_JAR, NO_PLSQL_JAR, CANNOT_CREATE_DRIVER;
+        /** not yet registered */
+        NOT_REGISTERED, 
+        /** successfully registered */
+        REGISTERED,
+        /** cannot register because did not find driver or driver jar */
+        NO_DRIVER_OR_NO_JAR,
+        /** cannot find or jar */
+        NO_PLSQL_JAR, 
+        /** NB internal issue */
+        CANNOT_CREATE_DRIVER;
     }
 
     /**
      * Recognizer status
      */
     public enum RecognizerStatus {
-        SQL, PLSQL_BLOCK, PLSQL_BLOCK_INCOMPLETE, INDETERMINATE
+        /** naked SQL */
+        SQL,
+        /** PLSQL recognized */
+        PLSQL_BLOCK, 
+        /** partial PLSQL recognized */
+        PLSQL_BLOCK_INCOMPLETE, 
+        /** cannot continue */
+        INDETERMINATE
     }
     
     public RecognizerStatus _recognizerStatus;
@@ -116,6 +133,8 @@ public final class PLSQLDriver implements ConnectionListener, PropertyChangeList
     private DriverChange _changer = new DriverChange();
     
     private InputOutput _io;
+    private String _activeIOTitle = "PL/SQL";
+    
     
     @SuppressWarnings("LeakingThisInConstructor")
     private PLSQLDriver() {
@@ -235,22 +254,27 @@ public final class PLSQLDriver implements ConnectionListener, PropertyChangeList
         RecognizerStatus status;
         switch (CommProperties.valueOf(evt.getPropertyName())) {
             case DBMS_OUTPUT_LINE:
+                _io = IOProvider.getDefault().getIO(_activeIOTitle, false);
+                InputOutput io = IOProvider.getDefault().getIO(PLSQL_WINDOW, false);
                 _io.getOut().println(START_DBMS_OUTPUT);
+               io.getOut().println(START_DBMS_OUTPUT);
+                
                 String[] output = (String []) evt.getNewValue();
                 for (String line: output) {
                     _io.getOut().println(String.format("%s", line));
+                    io.getOut().println(String.format("%s", line));
                 }
                 _io.getOut().println(END_DBMS_OUTPUT);
+                io.getOut().println(END_DBMS_OUTPUT);
                 break;
             case NEW_CONNECTION:
-                _io = IOProvider.getDefault().getIO(PLSQL_WINDOW, false);
-                _io.getOut().println(String.format(NEW_CONNECTION_MSG, evt.getNewValue()));
+                IOProvider.getDefault().getIO(PLSQL_WINDOW, false).getOut().println(
+                        String.format(NEW_CONNECTION_MSG, evt.getNewValue()));
                 break;
             case NEW_STATEMENT:
                 break;
             case DISCONNECTED:
-                _io = IOProvider.getDefault().getIO(PLSQL_WINDOW, false);
-                _io.getOut().println();
+                IOProvider.getDefault().getIO(PLSQL_WINDOW, false).getOut().println();
                 break;
             case RECOGNIZE:
                 status = recognizer((String) evt.getNewValue());
@@ -270,10 +294,13 @@ public final class PLSQLDriver implements ConnectionListener, PropertyChangeList
         }
     }
     
+    public void setIO(String title) {
+        _activeIOTitle = title;
+    }
+    
     private void postRecognize(RecognizerStatus status, PropertyChangeEvent evt) {
         if (status == RecognizerStatus.PLSQL_BLOCK) {
-            _io = IOProvider.getDefault().getIO(PLSQL_WINDOW, false);
-            _io.getOut().println((String) evt.getNewValue());
+            IOProvider.getDefault().getIO(PLSQL_WINDOW, false).getOut().println((String) evt.getNewValue());
         }
         _changer.firePropertyChange(CommProperties.RECOGNIZER.name(), evt.getOldValue(), 
                 status.name());

@@ -16,13 +16,9 @@ import javax.swing.DefaultCellEditor;
 import javax.swing.DefaultComboBoxModel;
 import javax.swing.JComboBox;
 import javax.swing.JTable;
-import javax.swing.table.AbstractTableModel;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableColumn;
 import javax.swing.table.TableModel;
-import org.netbeans.api.settings.ConvertAsProperties;
-import org.openide.awt.ActionID;
-import org.openide.awt.ActionReference;
 import org.openide.windows.TopComponent;
 import org.openide.util.NbBundle.Messages;
 import org.openide.windows.Mode;
@@ -122,6 +118,11 @@ public final class PLSQLParametersTopComponent extends TopComponent {
     public void componentClosed() {
 
         String x = "10";
+    }
+    
+    @Override
+    public boolean canClose() {
+        return true;
     }
 
     private TableModel getTableModel() {

@@ -161,10 +161,10 @@ public class Driver implements java.sql.Driver, PropertyChangeListener {
             String name;
             try {
                 name = String.format(NAME_MSG,url, getSchema());
-                _changer.firePropertyChange(NEW_CONNECTION.name(), null, name);
-            } catch (SQLException ex) {
+            } catch (Throwable ex) {
                 name = "unknown";
             }
+            _changer.firePropertyChange(NEW_CONNECTION.name(), null, name);
             _name = name;
             _request = new RequestProcess(_changer);
             _dbmsOutput = new DbmsOutputProcess(changer, wrapper, _name);

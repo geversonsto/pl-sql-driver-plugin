@@ -6,12 +6,10 @@
 
 package name.dougmcneil.plsql.action;
 import java.awt.Component;
-import java.awt.ComponentOrientation;
 import java.awt.event.ActionEvent;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
-import static java.lang.Boolean.FALSE;
-import static java.lang.Boolean.TRUE;
+import java.io.File;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Collection;
@@ -31,15 +29,9 @@ import org.openide.util.LookupListener;
 import org.openide.util.Mutex;
 import org.openide.util.NbBundle;
 import org.openide.util.actions.Presenter;
-import org.openide.windows.Mode;
 import org.openide.windows.TopComponent;
-import static org.openide.windows.TopComponent.PROP_DRAGGING_DISABLED;
-import static org.openide.windows.TopComponent.PROP_CLOSING_DISABLED;
-import static org.openide.windows.TopComponent.PROP_KEEP_PREFERRED_SIZE_WHEN_SLIDED_IN;
-import static org.openide.windows.TopComponent.PROP_MAXIMIZATION_DISABLED;
-import static org.openide.windows.TopComponent.PROP_SLIDING_DISABLED;
-import static org.openide.windows.TopComponent.PROP_UNDOCKING_DISABLED;
 import org.openide.windows.WindowManager;
+import static org.openide.windows.WindowManager.getDefault;
 
 /**
  * Invoke PLSQL Parameters window and hook into SQLExecution activity, allowing
@@ -48,15 +40,21 @@ import org.openide.windows.WindowManager;
  * @author doug
  */
 @NbBundle.Messages({
-    "CTL_PLSQLParametersAction=PLSQL Parameters"})
+    "CTL_PLSQLParametersAction=PLSQL Parameters", "LBL_Execution=execution"})
 public class PLSQLParametersAction  extends AbstractAction
         implements ContextAwareAction, HelpCtx.Provider {
     
     private static final String ICON_BASE = "name/dougmcneil/plsql/resources/plsql.png";
+    
+    private static final String EXECUTING_PROP = "executing";
 
     // load driver when node requested
     private static final PLSQLDriver PLSQL_DRIVER =
         PLSQLDriver.getInstance();
+    
+    private static final WindowManager WM_D = getDefault();
+    private static final Class PCL_c = PropertyChangeListener.class;
+
     
     public PLSQLParametersAction() {
     }
@@ -120,7 +118,7 @@ public class PLSQLParametersAction  extends AbstractAction
                         Class<?>[] faces = o.getClass().getInterfaces();
                         for (Class klass: faces) {
                             if (klass.getName().endsWith("SQLExecution")) {
-                                Method m = klass.getMethod("addPropertyChangeListener", PropertyChangeListener.class);
+                                Method m = klass.getMethod("addPropertyChangeListener", PCL_c);
                                 PropertyChangeListener listener = new PropertyChangeListener() {
                                     public void propertyChange(PropertyChangeEvent evt) {
                                         propertyChanged(evt.getPropertyName());
@@ -147,30 +145,21 @@ public class PLSQLParametersAction  extends AbstractAction
         }
         
          private void propertyChanged(String propertyName) {
-            if (propertyName == null) {
-                Mutex.EVENT.readAccess(new Runnable() {
-                    public void run() {
-                        boolean enabled = false;
- 
-                        setEnabled(true);
-                        putValue(Action.NAME, Bundle.CTL_PLSQLParametersAction());
-                    }
-                });
+            if (propertyName != null && propertyName.equals(EXECUTING_PROP)) {
+                PLSQLDriver.getInstance().setIO(getOutputWindowTitle(_title));
             }
         }
          
        @Override
         public void actionPerformed(ActionEvent e) {
             if (_window == null) {
-                TopComponent win = WindowManager.getDefault().findTopComponent
-                        ("PLSQLParametersTopComponent");
+                TopComponent win = WM_D.findTopComponent("PLSQLParametersTopComponent");
                 _window = (PLSQLParametersTopComponent) win;
                 _window.applyConfiguration(_title);
                 _window.open();
             } else {
                 if (!_window.isOpened()) {
-                    TopComponent win = WindowManager.getDefault().findTopComponent
-                            ("PLSQLParametersTopComponent");
+                    TopComponent win = WM_D.findTopComponent("PLSQLParametersTopComponent");
                     _window = (PLSQLParametersTopComponent) win;
                     _window.applyConfiguration(_title);
                     _window.open();
@@ -178,6 +167,14 @@ public class PLSQLParametersAction  extends AbstractAction
             }
             _window.requestActive();
 
+        }
+        
+        private String getOutputWindowTitle(String title) {
+            String prefix = _title.substring(_title.lastIndexOf(File.separatorChar) + 1, _title.length());
+            if (prefix.startsWith("SQL")) {
+                prefix = prefix.substring(0, 5).trim();
+            }
+            return  prefix + " " + Bundle.LBL_Execution();
         }
         
         @Override
