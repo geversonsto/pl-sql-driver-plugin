@@ -43,7 +43,7 @@ public class PLSQLNodeProvider extends NodeProvider {
         static final NodeProviderFactory FACTORY = new NodeProviderFactory() {
 
             @Override
-            public PLSQLNodeProvider createInstance(Lookup lookup) {
+            public PLSQLNodeProvider createInstance(final Lookup lookup) {
                 PLSQLNodeProvider provider = new PLSQLNodeProvider(lookup);
 
                 return provider;

@@ -34,7 +34,6 @@ import java.sql.SQLXML;
 import java.sql.Savepoint;
 import java.sql.Statement;
 import java.sql.Struct;
-import java.sql.Types;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Properties;
@@ -154,7 +153,8 @@ public class Driver implements java.sql.Driver, PropertyChangeListener {
         private final PropertyChangeSupport _changer;
         private final DbmsOutputProcess _dbmsOutput;
         private RequestProcess _request;
-        private PLSQLConnection(String url, Connection wrapper, PropertyChangeSupport changer) {
+        private PLSQLConnection(final String url, final Connection wrapper, 
+                final PropertyChangeSupport changer) {
             _url = url;
             _wrapper = wrapper;
             _changer = changer;
@@ -461,9 +461,9 @@ public class Driver implements java.sql.Driver, PropertyChangeListener {
         final Statement _wrapper;
         final Connection _connection;
         
-        private PLSQLStatement(Connection connection, Statement wrapper, 
-                PropertyChangeSupport changer, RequestProcess request,
-                DbmsOutputProcess dbmsOutput, String connectionName) {
+        private PLSQLStatement(final Connection connection, final Statement wrapper, 
+                final PropertyChangeSupport changer, final RequestProcess request,
+                final DbmsOutputProcess dbmsOutput, final String connectionName) {
             _connectionName = connectionName;
             _statementCount++;
             _connection = connection;
@@ -730,12 +730,12 @@ public class Driver implements java.sql.Driver, PropertyChangeListener {
     private static class DbURLClassLoader extends URLClassLoader {
 
         /** Creates a new instance of DbURLClassLoader */
-        public DbURLClassLoader(URL[] urls) {
+        public DbURLClassLoader(final URL[] urls) {
             super(urls);
         }
 
         @Override
-        protected PermissionCollection getPermissions(CodeSource codesource) {
+        protected PermissionCollection getPermissions(final CodeSource codesource) {
             Permissions permissions = new Permissions();
             permissions.add(new AllPermission());
             permissions.setReadOnly();
@@ -748,4 +748,5 @@ public class Driver implements java.sql.Driver, PropertyChangeListener {
             return "DbURLClassLoader[urls=" + Arrays.asList(getURLs()) + "]"; // NOI18N
         }
     }
+    
 }

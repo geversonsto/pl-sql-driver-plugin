@@ -11,6 +11,7 @@ import java.beans.PropertyChangeListener;
 import java.beans.PropertyChangeSupport;
 import java.sql.CallableStatement;
 import java.sql.SQLException;
+import java.util.regex.Pattern;
 import name.dougmcneil.plsql.PLSQLDriver.CommProperties;
 import name.dougmcneil.plsql.PLSQLDriver.RecognizerStatus;
 import name.dougmcneil.plsql.jdbc.Driver.PLSQLStatement;
@@ -35,6 +36,8 @@ class RequestProcess implements PropertyChangeListener {
     // time gathering sessions
     private long _timer;
     
+    private String[][] _parameters;
+    
     enum Status {
 
         READY, GATHERING, RECOGNIZED, EXECUTED
@@ -47,12 +50,13 @@ class RequestProcess implements PropertyChangeListener {
     
     private Status _status = Status.READY;
     
-    RequestProcess(PropertyChangeSupport pcs) {
+    RequestProcess(final PropertyChangeSupport pcs) {
         _pcs = pcs;
         _pcs.addPropertyChangeListener(CommProperties.RECOGNIZER.name(), this);
+        _pcs.addPropertyChangeListener(CommProperties.PARAMETERS.name(), this);
     }
     
-    void setStatement(PLSQLStatement statement) {
+    void setStatement(final PLSQLStatement statement) {
         _statement = statement;
     }
 
@@ -61,7 +65,7 @@ class RequestProcess implements PropertyChangeListener {
      * @param event marking transition
      * @return what status transitioned to
      */
-    public Status event(Event event) {
+    public Status event(final Event event) {
         switch (_status) {
             case READY:
                 _timer = System.currentTimeMillis();
@@ -101,7 +105,7 @@ class RequestProcess implements PropertyChangeListener {
     }
     
     @Override
-    public void propertyChange(PropertyChangeEvent evt) {
+    public void propertyChange(final PropertyChangeEvent evt) {
         switch (CommProperties.valueOf(evt.getPropertyName())) {
             case RECOGNIZER:
                 Long id = (Long) evt.getOldValue();
@@ -110,10 +114,13 @@ class RequestProcess implements PropertyChangeListener {
                     _status = _request.processRecognizer(output);
                 }
                 break;
+            case PARAMETERS:
+               _request.setSubstituted((String) evt.getNewValue());
+                break;
         }
     }
 
-    boolean execute(String sql) throws SQLException {
+    boolean execute(final String sql) throws SQLException {
         switch (_status) {
             case RECOGNIZED:
                 return _request.execute(sql);
@@ -131,17 +138,21 @@ class RequestProcess implements PropertyChangeListener {
         
         protected String _candidate = "";
         
-        String appendCandidate(String candidate) {
+        String appendCandidate(final String candidate) {
             _candidate = new StringBuilder(_candidate).append(candidate).append(";\n").toString();
             return _candidate;
         }
         
-        Status processRecognizer(String result) {
+        Status processRecognizer(final String result) {
             return _status;
         }
         
-        boolean execute(String sql) throws SQLException {
+        boolean execute(final String sql) throws SQLException {
             return false;
+        }
+        
+        void setSubstituted(final String sub) {
+            _candidate = sub;
         }
         
         void close() {
@@ -151,7 +162,7 @@ class RequestProcess implements PropertyChangeListener {
     
     private class BeginRequest extends RequestAbst {
         @Override
-        Status processRecognizer(String result) {
+        Status processRecognizer(final String result) {
             Status status = _status;
             switch(RecognizerStatus.valueOf(result)) {
                 case SQL:
@@ -179,9 +190,11 @@ class RequestProcess implements PropertyChangeListener {
     private class SQLRequest extends RequestAbst {
         
         @Override
-        boolean execute(String sql) throws SQLException {
+        boolean execute(final String sql) throws SQLException {
             _status = Status.EXECUTED;
-            return _statement._wrapper.execute(sql);
+            _candidate = _candidate.replace(';', ' ');
+            _candidate = _candidate.replace('\n', ' ');
+            return _statement._wrapper.execute(_candidate.trim());
         }
     }
     
@@ -191,14 +204,14 @@ class RequestProcess implements PropertyChangeListener {
         public PLSQLBlockRequest() {
         }
         
-        public PLSQLBlockRequest(String candidate) {
+        public PLSQLBlockRequest(final String candidate) {
             super();
             _candidate = candidate;
         }
         
         
         @Override
-        Status processRecognizer(String result) {
+        Status processRecognizer(final String result) {
             Status status = _status;
             switch(RecognizerStatus.valueOf(result)) {
                 case PLSQL_BLOCK:
@@ -212,7 +225,8 @@ class RequestProcess implements PropertyChangeListener {
             return status;
         }
         @Override
-        boolean execute(String sql) throws SQLException {
+        boolean execute(final String sql) throws SQLException {
+            _candidate = _candidate.replaceAll("\\;\\s*\\;", ";");
             _status = Status.EXECUTED;
             _cStatement = _statement._connection.prepareCall(_candidate);
             return _cStatement.execute();

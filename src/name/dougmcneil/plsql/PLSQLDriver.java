@@ -9,14 +9,19 @@ package name.dougmcneil.plsql;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.beans.PropertyChangeSupport;
+import java.io.CharArrayWriter;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Properties;
 import java.util.logging.Level;
+import java.util.logging.Logger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import static name.dougmcneil.plsql.Loggers.DRIVER_LOG;
 import static name.dougmcneil.plsql.Loggers.INIT_LOG;
 import static name.dougmcneil.plsql.Loggers.EVENT_LOG;
@@ -37,6 +42,7 @@ import org.openide.util.Exceptions;
 import org.openide.util.NbBundle;
 import org.openide.windows.IOProvider;
 import org.openide.windows.InputOutput;
+import org.openide.windows.OutputWriter;
 import org.plsql.PLSQLLexer;
 import org.plsql.PLSQLParser;
 import static org.plsql.PLSQLParser.BEGIN;
@@ -67,6 +73,8 @@ public final class PLSQLDriver implements ConnectionListener, PropertyChangeList
     private static final String EVENT_MSG = NbBundle.getMessage(PLSQLDriver.class, "change-event_msg");
     private static final String PLSQL_WINDOW = "PL/SQL-Driver";
     
+    private static final String PARAM_MSG = "%s=%s";
+    
     public static enum CommProperties {
         /** the PropertyChangeSupport object */
         DRIVER_CHANGER,
@@ -91,7 +99,9 @@ public final class PLSQLDriver implements ConnectionListener, PropertyChangeList
         /** Recognize gathering plsql from driver */
         RECOGNIZE_GATHERING,
         /** Recognizer result */
-        RECOGNIZER;
+        RECOGNIZER,
+        /** Parameters */
+        PARAMETERS;
         
     }
     
@@ -134,6 +144,10 @@ public final class PLSQLDriver implements ConnectionListener, PropertyChangeList
     
     private InputOutput _io;
     private String _activeIOTitle = "PL/SQL";
+    
+    private String[][] _parameters;
+    
+    private String _substitute;
     
     
     @SuppressWarnings("LeakingThisInConstructor")
@@ -250,22 +264,18 @@ public final class PLSQLDriver implements ConnectionListener, PropertyChangeList
 
     // All "communication" between Driver/Connection and PLSQLDRiver flows through here
     @Override
-    public void propertyChange(PropertyChangeEvent evt) {
+    public void propertyChange(final PropertyChangeEvent evt) {
         RecognizerStatus status;
         switch (CommProperties.valueOf(evt.getPropertyName())) {
             case DBMS_OUTPUT_LINE:
                 _io = IOProvider.getDefault().getIO(_activeIOTitle, false);
-                InputOutput io = IOProvider.getDefault().getIO(PLSQL_WINDOW, false);
                 _io.getOut().println(START_DBMS_OUTPUT);
-               io.getOut().println(START_DBMS_OUTPUT);
                 
                 String[] output = (String []) evt.getNewValue();
                 for (String line: output) {
                     _io.getOut().println(String.format("%s", line));
-                    io.getOut().println(String.format("%s", line));
                 }
                 _io.getOut().println(END_DBMS_OUTPUT);
-                io.getOut().println(END_DBMS_OUTPUT);
                 break;
             case NEW_CONNECTION:
                 IOProvider.getDefault().getIO(PLSQL_WINDOW, false).getOut().println(
@@ -277,11 +287,13 @@ public final class PLSQLDriver implements ConnectionListener, PropertyChangeList
                 IOProvider.getDefault().getIO(PLSQL_WINDOW, false).getOut().println();
                 break;
             case RECOGNIZE:
-                status = recognizer((String) evt.getNewValue());
+                _substitute = substitute((String) evt.getNewValue(), _parameters);
+                status = recognizer(_substitute);
                 postRecognize(status, evt);
                 break;
             case RECOGNIZE_GATHERING:
-                status = recognizerPLSQL((String) evt.getNewValue());
+                _substitute = substitute((String) evt.getNewValue(), _parameters);
+                status = recognizerPLSQL(_substitute);
                 postRecognize(status, evt);
                 break;
             case ERROR_DBMS_OUTPUT:
@@ -294,20 +306,33 @@ public final class PLSQLDriver implements ConnectionListener, PropertyChangeList
         }
     }
     
-    public void setIO(String title) {
+    public void setIO(final String title) {
         _activeIOTitle = title;
     }
     
-    private void postRecognize(RecognizerStatus status, PropertyChangeEvent evt) {
-        if (status == RecognizerStatus.PLSQL_BLOCK) {
-            IOProvider.getDefault().getIO(PLSQL_WINDOW, false).getOut().println((String) evt.getNewValue());
+    public void setParameters(final String[][] data) {
+        _parameters = data;
+    }
+    
+    private void postRecognize(final RecognizerStatus status, final PropertyChangeEvent evt) {
+        _changer.firePropertyChange(CommProperties.RECOGNIZER.name(), evt.getOldValue(), status.name());
+        if (status == RecognizerStatus.PLSQL_BLOCK || status == RecognizerStatus.SQL) {
+            _changer.firePropertyChange(CommProperties.PARAMETERS.name(), evt.getOldValue(), _substitute);
+            
+            // output parameters and PLSQL
+            OutputWriter io = IOProvider.getDefault().getIO(PLSQL_WINDOW, false).getOut();
+            for (int i = 0 ; i < _parameters.length; i++) {
+                if (_parameters[i][1].equals("")) {
+                    continue;
+                }
+                io.println(String.format(PARAM_MSG, _parameters[i][0], _parameters[i][1]));
+            }
+            io.println(_substitute);
         }
-        _changer.firePropertyChange(CommProperties.RECOGNIZER.name(), evt.getOldValue(), 
-                status.name());
     }
     
     // When plsql driver is first created (or found on startup) it must be integrated with NetBeans
-    private void initDriver(JDBCDriver driver) {
+    private void initDriver(final JDBCDriver driver) {
         try {
             Properties props = new Properties();
             props.put(CommProperties.DRIVER_CHANGER.name(), _changer);
@@ -329,7 +354,7 @@ public final class PLSQLDriver implements ConnectionListener, PropertyChangeList
         }
     }
     
-    private RecognizerStatus recognizer(String candidate) {
+    private RecognizerStatus recognizer(final String candidate) {
         // order of likeliness
         _recognizerStatus = RecognizerStatus.INDETERMINATE;
         if (recognizeSQL(candidate)) {
@@ -340,12 +365,12 @@ public final class PLSQLDriver implements ConnectionListener, PropertyChangeList
         return _recognizerStatus;
     }
     
-    private RecognizerStatus recognizerPLSQL(String candidate) {
+    private RecognizerStatus recognizerPLSQL(final String candidate) {
         recognizePLSQLBlock(candidate);
         return _recognizerStatus;
     }
     
-    private boolean recognizeSQL(String candidate) {
+    private boolean recognizeSQL(final String candidate) {
         try {
             //lexer splits input into tokens
             ANTLRStringStream input = new ANTLRStringStream(candidate);
@@ -365,7 +390,7 @@ public final class PLSQLDriver implements ConnectionListener, PropertyChangeList
             return false;
         }
     }
-    private boolean recognizePLSQLBlock(String candidate) {
+    private boolean recognizePLSQLBlock(final String candidate) {
         try {
             //lexer splits input into tokens
             ANTLRStringStream input = new ANTLRStringStream(candidate);
@@ -396,7 +421,61 @@ public final class PLSQLDriver implements ConnectionListener, PropertyChangeList
         }
     }
     
-    private final SparseArray getLeftSparse(List<CommonTree> children) {
+    // perform some substitution algorithm
+    private static String substitute(final String plsql, final String[][] parameters) {
+        String sub = plsql;
+        if (parameters == null) {
+            return sub;
+        }
+        try {
+            for (int i = 0; i < 10; i++) {
+                String regex = parameters[i][0];
+                Pattern pattern = Pattern.compile(Pattern.quote(regex));
+                Matcher matcher =pattern.matcher(sub);
+                String value = parameters[i][1];
+                if (value == null || (value.length() == 0)) {
+                    continue;
+                }
+                value = substituteURL(regex, value);
+                sub = matcher.replaceAll(value);
+            }
+        } catch (Exception ex) {
+            Logger.getLogger(PLSQLDriver.class.getName()).log(Level.WARNING, 
+                    "Problem substituting parameters.", ex);;
+        }
+        return sub;
+    }
+    
+    private static String substituteURL(final String parameter, final String value) {
+        InputStreamReader is = null;
+        CharArrayWriter os;
+        if (parameter.equals("${url}")) {
+            try {
+                URL url = new URL(value);
+                is = new InputStreamReader(url.openStream());
+                os = new CharArrayWriter(4096);
+                int ch = 0;
+                while ((ch = is.read()) != -1) {
+                    os.write(ch);
+                }
+                os.flush();
+                return new String(os.toCharArray());
+            } catch (MalformedURLException ex) {
+                //not an URL no substitution
+            } catch (IOException ex) {
+            } finally {
+                if (is != null) {
+                    try {
+                        is.close();
+                    } catch (IOException ex) {
+                    }
+                }
+            }
+        }
+        return value;
+    }
+    
+    private final SparseArray getLeftSparse(final List<CommonTree> children) {
         int[] ints = new int[children.size()];
         int i = 0;
         for(CommonTree tree: children) {
@@ -410,12 +489,12 @@ public final class PLSQLDriver implements ConnectionListener, PropertyChangeList
         
         final int[] _array;
 
-        public SparseArray(int[] array) {
+        public SparseArray(final int[] array) {
             _array = array;
         }
         
         @Override
-        public boolean equals(Object alien) {
+        public boolean equals(final Object alien) {
             if (!(alien instanceof SparseArray)) {
                 return false;
             }

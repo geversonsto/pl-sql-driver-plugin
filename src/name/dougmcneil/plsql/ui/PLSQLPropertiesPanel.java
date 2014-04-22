@@ -125,7 +125,7 @@ public class PLSQLPropertiesPanel extends javax.swing.JPanel {
         }
     }//GEN-LAST:event_jCheckBoxRegisteredActionPerformed
 
-    private static void checkStatus(JCheckBox box, JTextField text) {
+    private static void checkStatus(final JCheckBox box, final JTextField text) {
         if (PLSQLDriver.getInstance().getStatus() == PLSQLDriver.Status.NO_DRIVER_OR_NO_JAR) {
             text.setText(NbBundle.getMessage(
                     PLSQLPropertiesPanel.class, "registered.status.no_driver_or_no_jar"));

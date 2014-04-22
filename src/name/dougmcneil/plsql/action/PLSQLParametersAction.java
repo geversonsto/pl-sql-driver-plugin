@@ -13,9 +13,12 @@ import java.io.File;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
 import javax.swing.AbstractAction;
 import javax.swing.Action;
 import javax.swing.JButton;
+import javax.swing.SwingUtilities;
 import name.dougmcneil.plsql.PLSQLDriver;
 import name.dougmcneil.plsql.ui.PLSQLParametersTopComponent;
 import org.openide.awt.Actions;
@@ -26,10 +29,8 @@ import org.openide.util.HelpCtx;
 import org.openide.util.Lookup;
 import org.openide.util.LookupEvent;
 import org.openide.util.LookupListener;
-import org.openide.util.Mutex;
 import org.openide.util.NbBundle;
 import org.openide.util.actions.Presenter;
-import org.openide.windows.TopComponent;
 import org.openide.windows.WindowManager;
 import static org.openide.windows.WindowManager.getDefault;
 
@@ -55,7 +56,20 @@ public class PLSQLParametersAction  extends AbstractAction
     private static final WindowManager WM_D = getDefault();
     private static final Class PCL_c = PropertyChangeListener.class;
 
+    static {
+        Runtime.getRuntime().addShutdownHook(new Thread() {  
+            @Override
+            public void run() {
+                for (String win: PARAMETER_WINDOWS.keySet()) {
+                    PARAMETER_WINDOWS.get(win).persist();
+                }
+            }
+        });
+        
+    }
     
+    public static final Map<String, PLSQLParametersTopComponent> PARAMETER_WINDOWS =
+            new HashMap<String,PLSQLParametersTopComponent>(3);
     public PLSQLParametersAction() {
     }
     
@@ -64,7 +78,7 @@ public class PLSQLParametersAction  extends AbstractAction
     }
 
     @Override
-    public void actionPerformed(ActionEvent e) {
+    public void actionPerformed(final ActionEvent e) {
     }
 
     @Override
@@ -74,7 +88,7 @@ public class PLSQLParametersAction  extends AbstractAction
 
 
     @Override
-    public Action createContextAwareInstance(Lookup lkp) {
+    public Action createContextAwareInstance(final Lookup lkp) {
         return new ContextAwareDelegate(this, lkp);
     }
 
@@ -87,9 +101,11 @@ public class PLSQLParametersAction  extends AbstractAction
         private final String _title;
         
         private PLSQLParametersTopComponent _window;
+        
+        private boolean _creatingWindow;
     
         
-        public ContextAwareDelegate(PLSQLParametersAction action, Lookup lkp) {
+        public ContextAwareDelegate(final PLSQLParametersAction action, final Lookup lkp) {
             _parent = action;
             EditorCookie cookie = lkp.lookup(EditorCookie.class);
             _title = (String) cookie.getDocument().getProperty("title");
@@ -144,33 +160,81 @@ public class PLSQLParametersAction  extends AbstractAction
             }
         }
         
-         private void propertyChanged(String propertyName) {
+         private void propertyChanged(final String propertyName) {
             if (propertyName != null && propertyName.equals(EXECUTING_PROP)) {
                 PLSQLDriver.getInstance().setIO(getOutputWindowTitle(_title));
+                if (_window == null) {
+                    newWindowAndSet();
+                } else {
+                    PLSQLDriver.getInstance().setParameters(_window.getData());
+                }
             }
         }
          
        @Override
-        public void actionPerformed(ActionEvent e) {
+        public void actionPerformed(final ActionEvent e) {
+            _window = PARAMETER_WINDOWS.get(_title);
             if (_window == null) {
-                TopComponent win = WM_D.findTopComponent("PLSQLParametersTopComponent");
-                _window = (PLSQLParametersTopComponent) win;
-                _window.applyConfiguration(_title);
+                newWindow();
+            } else if (!_window.isOpened()) {
+                _window.applyWindowConfiguration();
                 _window.open();
-            } else {
-                if (!_window.isOpened()) {
-                    TopComponent win = WM_D.findTopComponent("PLSQLParametersTopComponent");
-                    _window = (PLSQLParametersTopComponent) win;
-                    _window.applyConfiguration(_title);
-                    _window.open();
-                }
             }
-            _window.requestActive();
+            if (_window != null) {
+                _window.requestActive();
+            }
 
         }
         
-        private String getOutputWindowTitle(String title) {
+        public void newWindow() {
+            if (_creatingWindow) {
+                return;
+            }
+            _creatingWindow = true;
+            // run on AWT thread
+            SwingUtilities.invokeLater(new Runnable() {
+
+                @Override
+                public void run() {
+                    PLSQLParametersTopComponent win = new PLSQLParametersTopComponent();
+                    PARAMETER_WINDOWS.put(_title, win);
+                    win.applyConfiguration(_title);
+                    win.open();
+                    win.requestActive();
+                    _window = (PLSQLParametersTopComponent) win;
+                    _creatingWindow = false;
+                }
+
+            });
+        }
+        
+        private void newWindowAndSet() {
+            if (_creatingWindow) {
+                return;
+            }
+            _creatingWindow = true;
+            SwingUtilities.invokeLater(new Runnable() {
+
+                @Override
+                public void run() {
+                    PLSQLParametersTopComponent win = new PLSQLParametersTopComponent();
+                    PARAMETER_WINDOWS.put(_title, win);
+                    win.applyConfiguration(_title);
+                    win.open();
+                    win.requestActive();
+                    _window = (PLSQLParametersTopComponent) win;
+                    PLSQLDriver.getInstance().setParameters(_window.getData());
+                    _creatingWindow = false;
+                }
+
+            });
+        }
+        
+        private String getOutputWindowTitle(final String title) {
             String prefix = _title.substring(_title.lastIndexOf(File.separatorChar) + 1, _title.length());
+            if (prefix.startsWith("SQL Command")) {
+                prefix = prefix.substring(0, 13).trim();
+            }
             if (prefix.startsWith("SQL")) {
                 prefix = prefix.substring(0, 5).trim();
             }

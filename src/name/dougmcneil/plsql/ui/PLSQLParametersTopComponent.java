@@ -8,9 +8,20 @@ package name.dougmcneil.plsql.ui;
 import java.awt.Component;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.MouseEvent;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import static java.lang.Boolean.FALSE;
 import static java.lang.Boolean.TRUE;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.prefs.BackingStoreException;
+import java.util.prefs.Preferences;
 import javax.swing.ComboBoxModel;
 import javax.swing.DefaultCellEditor;
 import javax.swing.DefaultComboBoxModel;
@@ -19,8 +30,11 @@ import javax.swing.JTable;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableColumn;
 import javax.swing.table.TableModel;
+import name.dougmcneil.plsql.ui.PLSQLParametersTopComponent.ParameterCellEditor.TableComboBox;
+import org.openide.util.Exceptions;
 import org.openide.windows.TopComponent;
 import org.openide.util.NbBundle.Messages;
+import org.openide.util.NbPreferences;
 import org.openide.windows.Mode;
 import static org.openide.windows.TopComponent.PROP_CLOSING_DISABLED;
 import static org.openide.windows.TopComponent.PROP_DRAGGING_DISABLED;
@@ -55,7 +69,7 @@ import org.openide.windows.WindowManager;
 })
 public final class PLSQLParametersTopComponent extends TopComponent {
     
-    private static String _title;
+    private String _title;
 
     public PLSQLParametersTopComponent() {
         initComponents();
@@ -63,8 +77,13 @@ public final class PLSQLParametersTopComponent extends TopComponent {
     
     public PLSQLParametersTopComponent applyConfiguration(String title) {
         _title = title;
+        ((ParameterTableModel) jTableParameters.getModel()).init(Data.DEFAULT.fromPerferences(title));
         setName(Bundle.CTL_PLSQLParametersTopComponent(truncateTitle(_title)));
         setToolTipText(Bundle.HINT_PLSQLParametersTopComponent());
+        return applyWindowConfiguration();
+    }
+    
+    public PLSQLParametersTopComponent applyWindowConfiguration() {
         WindowManager mgr = WindowManager.getDefault();
         Mode mode = mgr.findMode("rightSlidingSide");
         mode.dockInto(this);
@@ -85,7 +104,7 @@ public final class PLSQLParametersTopComponent extends TopComponent {
     private void initComponents() {
 
         jScrollPane1 = new javax.swing.JScrollPane();
-        jTableParameters = new javax.swing.JTable();
+        jTableParameters = new TooltipTable();
 
         jTableParameters.setModel(getTableModel());
         jTableParameters.setDoubleBuffered(true);
@@ -121,8 +140,18 @@ public final class PLSQLParametersTopComponent extends TopComponent {
     }
     
     @Override
+    protected String preferredID() {
+        return "PLSQLParametersTopComponent" + ((String) ((_title == null) ? "" : _title));
+        
+    }
+    
+    @Override
     public boolean canClose() {
-        return true;
+        return false;
+    }
+    
+    public void persist() {
+        getLast().toPreferences(_title);
     }
 
     private TableModel getTableModel() {
@@ -138,23 +167,30 @@ public final class PLSQLParametersTopComponent extends TopComponent {
         column.setCellEditor(new ParameterCellEditor(model, 1));
         
     }
-    private String truncateTitle(String title) {
-        return title.substring(title.lastIndexOf('\\') + 1, title.length());
+    private String truncateTitle(final String title) {
+        return title.substring(title.lastIndexOf(File.separatorChar) + 1, title.length());
     }
     
     private class ParameterTableModel extends DefaultTableModel implements ActionListener {
+        
+        boolean _dirty;
         
         private Class<?>[] _types = new Class<?>[] { Type.class, Type.class};
         
         private String[] _colNames = {Bundle.LBL_Name_Column(), Bundle.LBL_VALUE_Column()};
         
         Type[][] _data = {
-                {new Parameter(1), new Value("")}, {new Parameter(2), new Value("")}, 
-                    {new Parameter(3), new Value("")}, {new Parameter(4), new Value("")}, 
-                    {new Parameter(5), new Value("")}, {new Parameter(6), new Value("")},
-                    {new Parameter(7), new Value("")}, {new Parameter(8), new Value("")},
-                    {new Parameter(9), new Value("")}, {new Parameter(10), new Value("")}            
-        };
+                {new Parameter(1), new Value("")},
+                {new Parameter(2), new Value("")}, 
+                {new Parameter(3), new Value("")},
+                {new Parameter(4), new Value("")}, 
+                {new Parameter(5), new Value("")},
+                {new Parameter(6), new Value("")},
+                {new Parameter(7), new Value("")},
+                {new Parameter(8), new Value("")},
+                {new Parameter(9), new Value("")},
+                {new Parameter("${url}", 10), new Value("")}
+            };
         
         ComboBoxModel[][] _models = {{
             new DefaultComboBoxModel<Type>(), new DefaultComboBoxModel<Type>(),
@@ -169,9 +205,42 @@ public final class PLSQLParametersTopComponent extends TopComponent {
             new DefaultComboBoxModel<Type>(), new DefaultComboBoxModel<Type>()}};
         
         ParameterTableModel() {
-            setDataVector(_data, _colNames);
+            setColumnIdentifiers(_colNames);
+            //setDataVector(_data, _colNames);
         }
         
+        public void init(Data data) {
+            String[][] strings = data._data;
+            for (int i= 0, j = 0; i < 10; i++, j = j + 2) {
+                _data[i][0].setContent(strings[i][0]);
+                _data[i][1].setContent(strings[i][1]);
+                
+                List<String> list = data._modelData.get(j);
+                DefaultComboBoxModel<Type> box = (DefaultComboBoxModel<Type>) _models[0][i];
+                for(String param: list) {
+                    if (param.equals("")) {
+                        continue;
+                    }
+                    box.addElement(new Parameter(param, i+1));
+                }
+                box.setSelectedItem(new Parameter(_data[i][0].getContent(), 0));
+                
+                list = data._modelData.get(j+1);
+                box = (DefaultComboBoxModel<Type>) _models[1][i];
+                for(String value: list) {
+                    if (value.equals("")) {
+                        continue;
+                    }
+                    box.addElement(new Value(value));
+                }
+                String def = _data[i][1].getContent();
+                if (def.equals("")) {
+                    continue;
+                }
+                box.setSelectedItem(new Value(def));
+            }
+            
+        }
         @Override
         public int getRowCount() {
             return 10;
@@ -183,26 +252,26 @@ public final class PLSQLParametersTopComponent extends TopComponent {
         }
         
         @Override
-        public String getColumnName(int col) {
+        public String getColumnName(final int col) {
             return _colNames[col];
         }
         
         @Override
-        public Class<?> getColumnClass(int col) {
+        public Class<?> getColumnClass(final int col) {
             return _types[col];
         }
         
-        public boolean isCellEditable(int row, int col) {
+        public boolean isCellEditable(final int row, final int col) {
             return true;
         }
 
         @Override
-        public Object getValueAt(int rowIndex, int columnIndex) {
+        public Object getValueAt(final int rowIndex, final int columnIndex) {
             return _data[rowIndex][columnIndex];
         }
 
         @Override
-        public void actionPerformed(ActionEvent e) {
+        public void actionPerformed(final ActionEvent e) {
            if ("comboBoxEdited".equals(e.getActionCommand())) {
                 ParameterCellEditor.TableComboBox box = (ParameterCellEditor.TableComboBox)e.getSource();
                 DefaultComboBoxModel<Type> model = (DefaultComboBoxModel<Type>)box.getModel();
@@ -220,6 +289,7 @@ public final class PLSQLParametersTopComponent extends TopComponent {
                         box.setSelectedIndex(0);
                     } else {
                         box._model._data[box._row][box._col].setContent(null);
+                        _dirty = true;
                     }
                     return;
                 }
@@ -243,8 +313,8 @@ public final class PLSQLParametersTopComponent extends TopComponent {
         }
         
         @Override
-        public Component getTableCellEditorComponent(JTable table, Object value, 
-                boolean isSelected, int row, int column)  {
+        public Component getTableCellEditorComponent(final JTable table, final Object value, 
+                final boolean isSelected, final int row, final int column)  {
             _box.setModel(_models[row]);
             _box.setRow(row);
             Component comp = super.getTableCellEditorComponent(table, value, isSelected, row, column);
@@ -257,44 +327,170 @@ public final class PLSQLParametersTopComponent extends TopComponent {
             private final int _col;
             private int _row;
             private Type _last;
-            public TableComboBox(ParameterTableModel model, int col) {
+            public TableComboBox(final ParameterTableModel model, final int col) {
                 _model = model;
                 _col = col;
             }
             
-            void setRow(int row) {
+            void setRow(final int row) {
                 _row = row;
             }
 
             @Override
-            public void setSelectedItem(Object item) {
-                item = Type.promote(item, _row, _col);
-                super.setSelectedItem(item);
+            public void setSelectedItem(final Object item) {
+                final Type type = Type.promote(item, _row, _col);
+                super.setSelectedItem(type);
                 if (getSelectedIndex() == -1) {
                     return;
                 }
-                _last = (Type) item;
-                _model._data[_row][_col].setContent(((Type) item).getContent());
+                _last = type;
+                _model._data[_row][_col].setContent(type.getContent());
+                _model._dirty = true;
             }
 
         }
     
     }
-    private static class Data implements Serializable {
+    
+    // for serialization of preferences
+    private final static class Data implements Serializable {
         public static final long serialVersionUID = 1l;
         
-        String [][] getActive() {
-            return new String[][] { 
-                {"&1", null}, {"&2", null}, {"3", null}, {"4", null}, {"5", null},
-                {"6", null}, {"7", null}, {"8", null}, {"9", null}, {"10", null} };
+        public String [][] _data = new String[10][2];
+        public List<List<String>> _modelData;
+        
+        public static final Data DEFAULT = new Data();
+        
+        Data() {
+            _data = new String[][] {
+                {"&1", ""}, {"&2", ""}, {"&3", ""}, {"&4", ""}, {"&5", ""}, 
+                {"&6", ""}, {"&7", ""}, {"&8", ""},{"&9", ""}, {"${url}", ""}
+            };
+            _modelData = new ArrayList<List<String>>(20);
+            for (int i = 0; i < 10; i++) {
+                List<String> param = new ArrayList<String>(2);
+                param.add("&"+(i+1));
+                _modelData.add(param);
+                List<String> value = new ArrayList<String>(2);
+                value.add("");
+                _modelData.add(value);
+            }
         }
         
+        Data(final Type[][] types) {
+            for (int i = 0; i < 10; i++) {
+                for (int j = 0; j < 2; j++) {
+                    _data[i][j] = types[i][j].getContent();
+                }
+            }
+        }
+        
+        Data(final ParameterTableModel model) {
+            this(model._data);
+            _modelData = new ArrayList<List<String>>(20);
+            for (int i = 0; i < 10; i++) {
+                List<String> param = new ArrayList<String>(2);
+                List<String> value = new ArrayList<String>(2);
+                DefaultComboBoxModel<Type> box = (DefaultComboBoxModel<Type>) model._models[0][i];
+                int size = box.getSize();
+                for (int j = 0; j < size; j++) {
+                    param.add(box.getElementAt(j).getContent());
+                }
+                _modelData.add(param);
+                box = (DefaultComboBoxModel<Type>) model._models[1][i];
+                size = box.getSize();
+                for (int j = 0; j < size; j++) {
+                    value.add(box.getElementAt(j).getContent());
+                }
+                _modelData.add(value);
+            }
+        }
+        
+        String [][] getActive() {
+            return _data;
+        }
+        
+        Data fromPerferences(final String key) {
+            final Preferences perfs = NbPreferences.forModule(PLSQLParametersTopComponent.class);
+            if (perfs == null) {
+                return this;
+            }
+            byte [] serialized = perfs.getByteArray(key, null);
+            if (serialized == null) {
+                return this;
+            }
+            ByteArrayInputStream bais = new ByteArrayInputStream(serialized);
+            ObjectInputStream ois = null;
+            String[][] data = null;
+            List<List<String>> modelData = null;
+            try {
+                ois = new ObjectInputStream(bais);
+                data = (String[][]) ois.readObject();
+                modelData = (List<List<String>>) ois.readObject();
+                ois.close();
+            } catch (IOException ex) {
+                Exceptions.printStackTrace(ex);
+            } catch (ClassNotFoundException ex) {
+                Exceptions.printStackTrace(ex);
+            } finally {
+                if (ois != null) {
+                    try {
+                        ois.close();
+                    } catch (IOException ex) {
+                    }
+                }
+                if (data != null) {
+                    _data = data;
+                }
+                if (modelData != null) {
+                    _modelData = modelData;
+                }
+            }
+            
+            return this;
+        }
+        
+        void toPreferences(final String key) {
+            final Preferences perfs = NbPreferences.forModule(PLSQLParametersTopComponent.class);
+            if (perfs == null) {
+                return;
+            }
+            ByteArrayOutputStream baos = new ByteArrayOutputStream(1024);
+            ObjectOutputStream oos = null;
+            try {
+                oos = new ObjectOutputStream(baos);
+                oos.writeObject(_data);
+                oos.writeObject(_modelData);
+                oos.close();
+                perfs.putByteArray(key, baos.toByteArray());
+                perfs.flush();
+            } catch (IOException ex) {
+            } catch (BackingStoreException ex) {
+            } finally {
+                if (oos != null) {
+                    try {
+                        oos.close();
+                    } catch (IOException ex) {
+                    }
+                }
+            }
+        }
+        
+        
+    }
+    
+    public String[][] getData() {
+        return getLast().getActive();
+    }
+    
+    private Data getLast() {
+        return new Data((ParameterTableModel) jTableParameters.getModel());
     }
     
     private abstract static class Type {
         private String _content;
         
-        public Type(String content) {
+        public Type(final String content) {
             _content = content;
         }
         
@@ -302,7 +498,7 @@ public final class PLSQLParametersTopComponent extends TopComponent {
             return _content;
         }
         
-        public void setContent(String content) {
+        public void setContent(final String content) {
             if (content == null) {
                 _content = "";
                 return;
@@ -310,6 +506,26 @@ public final class PLSQLParametersTopComponent extends TopComponent {
             _content = content;
         }
         
+        @Override
+        public boolean equals(final Object alien) {
+            if (!(alien instanceof Type)) {
+                return false;
+            }
+            if (_content.equals(((Type) alien)._content)) {
+                return true;
+            }
+            return false;
+            
+        }
+
+        @Override
+        public int hashCode() {
+            int hash = 7;
+            hash = 29 * hash + (this._content != null ? this._content.hashCode() : 0);
+            return hash;
+        }
+        
+        @Override
         public String toString() {
             return _content;
         }
@@ -327,9 +543,12 @@ public final class PLSQLParametersTopComponent extends TopComponent {
     
     private static class Parameter extends Type {
         private int _pos;
-        public Parameter(String content, int row) {
+        public Parameter(final String content, final int row) {
             super(content);
             _pos = row + 1;
+            if (_pos == 10) {
+                setContent("${url}");
+            }
         }
         
         public Parameter(int pos) {
@@ -337,6 +556,7 @@ public final class PLSQLParametersTopComponent extends TopComponent {
             _pos = pos;
         }
         
+        @Override
         public void setContent(String content) {
             if (content == null || content.length() == 0) {
                 content = "&" + _pos;
@@ -346,8 +566,28 @@ public final class PLSQLParametersTopComponent extends TopComponent {
     }
     
     private static class Value extends Type {
-        public Value(String content) {
+        public Value(final String content) {
             super(content);
+        }
+    }
+    
+    private static class TooltipTable extends JTable {
+        public TooltipTable() {
+            super();
+        }
+        public String getToolTipText(MouseEvent e) {
+            String tip = null;
+            java.awt.Point p = e.getPoint();
+            int rowIndex = rowAtPoint(p);
+            int colIndex = columnAtPoint(p);
+
+            try {
+              tip = getValueAt(rowIndex, colIndex).toString();
+            } catch (RuntimeException e1) {
+                //catch null pointer exception if mouse is over an empty line
+            }
+
+            return tip;
         }
     }
 }
